@@ -1,13 +1,27 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env bash
+# bin/compile <build-dir> <cache-dir>
 
-# sync output
-$stdout.sync = true
+# watch out for CPPPATH/CPATH/LIBPATH, each library can vary
+# These files should be built for Heroku by Vulcan.
 
-$:.unshift File.expand_path("../../lib", __FILE__)
-require "language_pack"
+function cairo_vendor() {
+  binary="$1"
+  path="$2"
+  include="$3"
 
-if pack = LanguagePack.detect(ARGV[0], ARGV[1])
-  pack.log("compile") do
-    pack.compile
-  end
-end
+  echo "       Fetching $binary"
+  mkdir -p $path
+  package="https://s3.amazonaws.com/sr-public/libs/$binary"
+  curl $package -s -o - | tar xz -C $path -f -
+
+  echo "       Exporting $binary build and include paths"
+
+  export CPPPATH="$path/$include:$CPPPATH"
+  export CPATH="$path/$include:$CPATH"
+  export LIBRARY_PATH="$path/lib:$LIBRARY_PATH"
+  export PKG_CONFIG_PATH="$path/lib/pkgconfig:$PKG_CONFIG_PATH"
+}
+
+echo "-----> Vendoring Cairo"
+cairo_vendor "cairo-1.12.6.gz" "$1/vendor/cairo-1.12.6" "include/cairo"
+cairo_vendor "pixman-0.28.0.gz" "$1/vendor/pixman-0.28.0" "include/pixman"
